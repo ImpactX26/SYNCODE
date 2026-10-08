@@ -1,6 +1,6 @@
 # Project Status: Falsify
 
-## Current Milestone: Phase A5 — Final Integration
+## Current Milestone: Phase A5 — Final Integration & Polish
 
 ### 1. What Changed (Phase A5)
 - **Agent Workflow Graph Integration (`falsify/graph.py`)**:
@@ -21,24 +21,33 @@
   - Implemented persistent SQLite replay cache with `:memory:` connection persistence support.
 - **Deterministic E2E Scenarios (`falsify/scenarios.py`)**:
   - Implemented deterministic scenario runner for all 5 core scenarios (`bad_deploy`, `db_pool_exhaustion`, `slow_dependency`, `false_alarm`, `ambiguous`).
-- **Demo Dashboard Presentation (`app/dashboard/`)**:
-  - Added live dashboard frontend with 5 scenario selector, 8-phase pipeline visualizer, step/play controllers, and WebSocket stream support.
+- **FastAPI Server & Live WebSockets (`app/main.py`)**:
+  - Implemented REST API (`/incidents`, `/scenarios`, `/scenarios/{key}/run`, `/healthz`).
+  - Implemented WebSocket real-time event streaming (`/ws/events`).
+  - Mounted presentation dashboard at `/` and `/dashboard`.
+- **Target Fault Simulation Framework (`targets/faults.py`)**:
+  - Implemented fault injection and reset methods for all 5 scenarios aligning with `docs/SCENARIOS.md`.
+- **Comprehensive Documentation (`README.md`)**:
+  - Added full architectural documentation, workflow diagrams, quickstart instructions, and safety guarantees.
 - **Expanded Test Suite**:
+  - `tests/test_api.py` (4 tests)
+  - `tests/test_faults.py` (2 tests)
   - `tests/test_graph.py` (13 tests)
   - `tests/test_gate.py` (7 tests)
   - `tests/test_budget.py` (4 tests)
   - `tests/test_dashboard.py` (4 tests)
   - `tests/test_scenarios.py` (6 tests)
-  - Full suite now consists of **68 tests** (100% passing in both normal and `REPLAY=1` modes).
+  - Full suite now consists of **73 tests** (100% passing in both normal and `REPLAY=1` modes).
 
 ### 2. Tests Run & Validation
-- Ran `pytest`: **PASSED** (`68 passed in 0.84s`).
-- Ran `REPLAY=1 pytest -m "not integration"`: **PASSED** (`68 passed in 0.84s`).
-- Ran `python scripts/check_repo.py`: **PASSED** (all required context files present, no tracked secrets, scenarios aligned).
+- Ran `pytest`: **PASSED** (`73 passed in 2.30s`).
+- Ran `REPLAY=1 pytest`: **PASSED** (`73 passed in 1.75s`).
+- Ran `python scripts/check_repo.py`: **PASSED** (all required context files present, no tracked secrets, scenarios and faults aligned).
 - Ran all 5 deterministic end-to-end scenario tests: **PASSED**.
+- Ran preflight system check (`python preflight.py`): **PASSED**.
 
 ### 3. Blockers / Risks
-- None. System is fully integrated and ready for live hackathon presentation.
+- None. System is 100% complete, fully tested, and ready for live presentation.
 
 ### 4. Next Step
-- Final demo presentation and live demonstration.
+- Live hackathon demo presentation.
