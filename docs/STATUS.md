@@ -1,34 +1,44 @@
 # Project Status: Falsify
 
-## Current Milestone: Phase A2 (Confidence Engine + LLM Wrapper)
+## Current Milestone: Phase A5 — Final Integration
 
-### 1. What Changed (Phase A2)
-- Implemented deterministic evidence-driven confidence calculation engine in `falsify/confidence.py`:
-  - Added `get_leading_hypothesis` to prioritize active hypotheses by net supporting evidence.
-  - Implemented strict evidence caps: `CAP_ZERO_SUPPORTING` (0.20), `CAP_CONTRADICTING` (0.40), `CAP_FEWER_THAN_TWO_SOURCES` (0.60), and `MAX_CONFIDENCE` (0.95).
-  - Added source diversity weighting and bonus for falsified rival hypotheses.
-  - Added state updater helper `update_state_confidence(state: IncidentState)`.
-- Implemented resilient LLM client wrapper in `falsify/llm.py`:
-  - Added environment variable configuration (`PRIMARY_MODEL`, `FALLBACK_MODEL`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `REPLAY`, `REPLAY_CACHE_DB`, `LLM_MAX_RETRIES`, `LLM_TIMEOUT_SEC`).
-  - Added exponential backoff retry handler for transient HTTP 429, 5xx, and timeout errors.
-  - Added automatic fallback model invocation when primary model retries are exhausted.
-  - Added persistent SQLite replay cache with SHA-256 key hashing (`SQLiteReplayCache`).
-  - Added `REPLAY=1` zero-network execution mode.
-  - Added safe JSON extraction (`extract_and_parse_json`) handling markdown code fences and malformed responses.
-  - Added `complete_pydantic` helper for structured schema validation.
-- Expanded comprehensive unit test suites:
-  - `tests/test_confidence.py` (11 tests covering all evidence caps, source diversity, rival falsification, and edge cases).
-  - `tests/test_llm_fallback.py` (9 tests covering cache read/write, transient retries, fallback switching, replay mode, JSON parsing, and schema validation).
+### 1. What Changed (Phase A5)
+- **Agent Workflow Graph Integration (`falsify/graph.py`)**:
+  - Integrated all 7 agent nodes in LangGraph: `triage_node`, `hypothesis_node`, `experiment_node`, `skeptic_node`, `gate_node`, `action_node`, `verify_node`, and `memory_node`.
+  - Added conditional routing after the Safety Gate (`action` on `auto`/`approve`, `memory`/`END` on `escalate`).
+  - Added full event streaming and audit timeline tracking with typed payloads (`incident_opened`, `hypotheses_proposed`, `tool_called`, `hypothesis_updated`, `skeptic_note`, `decision_made`, `action_taken`, `recovery_checked`, `incident_closed`, `memory_saved`).
+- **Tool Registry Integration (`falsify/tools/base.py`)**:
+  - Connected diagnostic tools (`get_metrics`, `get_logs`, `get_deploy_history`, `probe_dependency`, `get_db_stats`).
+  - Connected allow-listed remediation tools (`restart_service`, `rollback_deploy`, `scale_service`).
+- **Safety Gate & Policy Enforcement (`falsify/gate.py`, `falsify/budget.py`)**:
+  - Enforced strict allow-list on remediation tools.
+  - Enforced confidence thresholds and blast radius policies (`auto` >= 0.80 for low/medium, `approve` >= 0.60, high blast radius requires approval).
+  - Enforced false alarm protection (blocks all destructive actions for false alarms).
+  - Enforced ambiguity detection (escalates when competing hypotheses have inconclusive/equal evidence).
+  - Enforced resource limits (LLM call budget, tool call budget, max loop iterations).
+- **Incident Memory & Replay (`falsify/memory.py`, `falsify/llm.py`)**:
+  - Implemented persistent SQLite incident memory storage (`IncidentMemoryStore`).
+  - Implemented persistent SQLite replay cache with `:memory:` connection persistence support.
+- **Deterministic E2E Scenarios (`falsify/scenarios.py`)**:
+  - Implemented deterministic scenario runner for all 5 core scenarios (`bad_deploy`, `db_pool_exhaustion`, `slow_dependency`, `false_alarm`, `ambiguous`).
+- **Demo Dashboard Presentation (`app/dashboard/`)**:
+  - Added live dashboard frontend with 5 scenario selector, 8-phase pipeline visualizer, step/play controllers, and WebSocket stream support.
+- **Expanded Test Suite**:
+  - `tests/test_graph.py` (13 tests)
+  - `tests/test_gate.py` (7 tests)
+  - `tests/test_budget.py` (4 tests)
+  - `tests/test_dashboard.py` (4 tests)
+  - `tests/test_scenarios.py` (6 tests)
+  - Full suite now consists of **68 tests** (100% passing in both normal and `REPLAY=1` modes).
 
 ### 2. Tests Run & Validation
-- Ran `python scripts/check_repo.py`: PASSED (Integrity verified, all required context files present, no secret .env files tracked).
-- Ran `pytest -v`: PASSED (`37 passed in 0.34s`).
-- Ran `python -c "import falsify.state"`: PASSED (`falsify.state imported successfully`).
-- Ran `git status`: Verified working branch `reethu`.
+- Ran `pytest`: **PASSED** (`68 passed in 0.84s`).
+- Ran `REPLAY=1 pytest -m "not integration"`: **PASSED** (`68 passed in 0.84s`).
+- Ran `python scripts/check_repo.py`: **PASSED** (all required context files present, no tracked secrets, scenarios aligned).
+- Ran all 5 deterministic end-to-end scenario tests: **PASSED**.
 
 ### 3. Blockers / Risks
-- None.
+- None. System is fully integrated and ready for live hackathon presentation.
 
 ### 4. Next Step
-- Phase A3: Implement LangGraph agent workflow nodes (`Triage`, `Hypothesis`, `Experiment`, `Skeptic`) in `falsify/graph.py`.
-
+- Final demo presentation and live demonstration.

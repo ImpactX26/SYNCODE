@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Falsify — Agentic AI SRE Incident Investigation System</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">FALSIFY</div>
+        <div class="brand-tagline">Agentic SRE Incident Engine</div>
+      </div>
+    </div>
+
+    <!-- Scenario Selector & Playback Controls -->
+    <div class="header-controls">
+      <div class="scenario-selector-wrap">
+        <label for="scenario-select">Demo Scenario:</label>
+        <select id="scenario-select" class="scenario-select">
+          <option value="bad_deploy">1. Bad Deploy (Memory Leak)</option>
+          <option value="db_pool_exhaustion">2. DB Connection Pool Exhaustion</option>
+          <option value="slow_dependency">3. Slow External Dependency</option>
+          <option value="false_alarm">4. False Alarm (Routine Backup)</option>
+          <option value="ambiguous">5. Ambiguous (Conflicting Signals)</option>
+        </select>
+      </div>
+
+      <div class="playback-controls">
+        <button id="btn-play" class="btn-ctrl" title="Run/Pause Simulation">
+          <span>▶</span> Run Simulation
+        </button>
+        <button id="btn-step" class="btn-ctrl" title="Step to Next Agent Action">
+          <span>⏭</span> Step
+        </button>
+        <button id="btn-reset" class="btn-ctrl" title="Reset Timeline">
+          <span>🔄</span> Reset
+        </button>
+        <select id="speed-select" class="btn-ctrl" style="cursor: pointer;">
+          <option value="1500">1x Speed</option>
+          <option value="800">2x Speed</option>
+          <option value="300">4x Speed</option>
+        </select>
+      </div>
+
+      <button id="btn-ws-toggle" class="btn-ctrl" style="border: 1px solid var(--border-subtle);">
+        Connect Live WS
+      </button>
+
+      <div class="mode-toggle">
+        <div class="live-indicator"></div>
+        <span id="connection-status">⚪ Simulation Mode</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stepper Pipeline Progress Bar -->
+  <section class="stepper-container">
+    <div class="stepper-track">
+      <div class="stepper-item" data-step="0">
+        <div class="step-node">1</div>
+        <div class="step-label">Observe</div>
+      </div>
+      <div class="stepper-item" data-step="1">
+        <div class="step-node">2</div>
+        <div class="step-label">Hypothesize</div>
+      </div>
+      <div class="stepper-item" data-step="2">
+        <div class="step-node">3</div>
+        <div class="step-label">Experiment</div>
+      </div>
+      <div class="stepper-item" data-step="3">
+        <div class="step-node">4</div>
+        <div class="step-label">Skeptic</div>
+      </div>
+      <div class="stepper-item" data-step="4">
+        <div class="step-node">5</div>
+        <div class="step-label">Safety Gate</div>
+      </div>
+      <div class="stepper-item" data-step="5">
+        <div class="step-node">6</div>
+        <div class="step-label">Act</div>
+      </div>
+      <div class="stepper-item" data-step="6">
+        <div class="step-node">7</div>
+        <div class="step-label">Verify</div>
+      </div>
+      <div class="stepper-item" data-step="7">
+        <div class="step-node">8</div>
+        <div class="step-label">Outcome</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main 3-Column Dashboard Layout -->
+  <main class="main-layout">
+    
+    <!-- Left Column: Incident Overview & Confidence Engine -->
+    <div class="dash-card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-title">Incident Context</div>
+        </div>
+        <span id="incident-status-badge" class="card-badge badge-info">INVESTIGATING</span>
+      </div>
+
+      <div class="incident-summary-box">
+        <div id="incident-title" class="incident-title">Memory leak & latency spike on /checkout endpoint</div>
+        
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span class="meta-label">Suspected Target</span>
+            <span id="meta-service" class="meta-value">falsify-demo-payment</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Blast Radius</span>
+            <span id="meta-blast-radius" class="meta-value">LOW</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4;">
+        <strong style="color: var(--text-primary);">Scenario Note:</strong>
+        <p id="scenario-desc" style="margin-top: 0.2rem;">Release v2.4.1 introduced an unclosed database connection leak.</p>
+      </div>
+
+      <!-- Confidence Gauge Box -->
+      <div class="confidence-box">
+        <div class="confidence-header">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Deterministic Confidence</span>
+          <span id="confidence-value" class="confidence-score">0.00</span>
+        </div>
+        <div class="confidence-bar-wrap">
+          <div id="confidence-bar-fill" class="confidence-bar-fill"></div>
+        </div>
+        <div class="caps-info">
+          <strong>Deterministic Rules:</strong> Confidence is calculated from corroborating evidence, not guessed by LLMs. Caps apply for zero evidence (0.20), contradictions (0.40), and single sources (0.60). Max 0.95.
+        </div>
+      </div>
+
+      <!-- Expected Outcome Card -->
+      <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.8rem; font-size: 0.76rem;">
+        <span style="color: var(--accent-cyan); font-weight: 700; text-transform: uppercase;">Expected Outcome</span>
+        <p id="expected-outcome" style="color: var(--text-secondary); margin-top: 0.25rem;">
+          Diagnose release regression, verify with deploy history & metrics, auto-rollback to v2.4.0, verify recovery.
+        </p>
+      </div>
+    </div>
+
+    <!-- Center Column: Competing Hypotheses & Diagnostic Arena -->
+    <div class="dash-card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-title">Competing Hypotheses Arena</div>
+        </div>
+        <span class="card-badge badge-info">FALSIFICATION LOOP</span>
+      </div>
+
+      <div id="hypotheses-list" class="hypotheses-list">
+        <!-- Dynamically rendered hypotheses -->
+      </div>
+
+      <!-- Diagnostic Telemetry Card -->
+      <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.75rem;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">
+          Last Diagnostic Tool Telemetry
+        </div>
+        <div id="diagnostics-container">
+          <!-- Dynamically updated tool output -->
+        </div>
+      </div>
+
+      <!-- Skeptic Attack Callout -->
+      <div id="skeptic-card" class="skeptic-box" style="display: none;">
+        <div class="skeptic-header">
+          <span>⚔️ Skeptic Agent Challenge</span>
+        </div>
+        <div id="skeptic-critique" class="skeptic-content">
+          Awaiting review...
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Safety Gate, Remediation & Verification -->
+    <div class="dash-card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-title">Safety Gate & Remediation</div>
+        </div>
+        <span class="card-badge badge-success">ALLOW-LIST ENFORCED</span>
+      </div>
+
+      <!-- Gate Policy Status -->
+      <div class="gate-box">
+        <div id="gate-status-pill" class="gate-status-pill pending">
+          <span>Gate Outcome</span>
+          <span>PENDING</span>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+          <div class="gate-rule-item">
+            <span>Allow-listed Action</span>
+            <span style="color: var(--accent-emerald); font-weight: 700;">✓ REQUIRED</span>
+          </div>
+          <div class="gate-rule-item">
+            <span>Auto Threshold</span>
+            <span style="font-family: var(--font-mono);">≥ 0.80 Confidence</span>
+          </div>
+          <div class="gate-rule-item">
+            <span>Target Isolation</span>
+            <span style="color: var(--accent-cyan); font-family: var(--font-mono);">demo containers only</span>
+          </div>
+        </div>
+
+        <p id="gate-reason" style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.2rem;">
+          Awaiting skeptic challenge and evidence verification.
+        </p>
+      </div>
+
+      <!-- Executed Remediation Action Card -->
+      <div id="action-card" class="action-card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Executed Action</span>
+          <span class="card-badge badge-success">EXECUTED</span>
+        </div>
+        <div id="action-name" class="action-name">rollback_deploy</div>
+        <div id="action-params" class="action-params">{ "service_name": "falsify-demo-payment" }</div>
+      </div>
+
+      <!-- Post-Action Recovery Verification Card -->
+      <div id="verification-card" class="verification-card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; font-size: 0.8rem; text-transform: uppercase;">Verification Probe</span>
+        </div>
+        <p id="verification-finding" style="line-height: 1.4;"></p>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Bottom Event Timeline Drawer -->
+  <footer class="events-drawer">
+    <div class="events-header">
+      <div class="events-title">Live Timeline Audit Event Stream (docs/CONTRACTS.md)</div>
+      <span id="event-count" style="font-size: 0.75rem; color: var(--accent-cyan); font-family: var(--font-mono);">0 Events</span>
+    </div>
+    <div id="events-container">
+      <!-- Dynamically appended event envelopes -->
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="mock_data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
