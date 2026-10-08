@@ -76,7 +76,7 @@ def test_llm_retry_on_transient_error(tmp_path):
             raise httpx.ConnectError("Temporary connection reset")
         return '{"status": "recovered_after_retry"}'
 
-    config = LLMConfig(cache_db_path=db_file, max_retries=3, backoff_factor=0.01)
+    config = LLMConfig(cache_db_path=db_file, max_retries=3, backoff_factor=0.01, replay_mode=False)
     client = LLMClient(config=config, custom_caller=transient_fail_caller)
 
     resp = client.complete("Test retry")
@@ -101,6 +101,7 @@ def test_llm_fallback_switching_when_primary_fails(tmp_path):
         cache_db_path=db_file,
         max_retries=2,
         backoff_factor=0.01,
+        replay_mode=False,
     )
     client = LLMClient(config=config, custom_caller=fallback_caller)
 
@@ -118,7 +119,7 @@ def test_llm_both_models_fail(tmp_path):
     def always_fail_caller(model, system, prompt, json_mode):
         raise httpx.ConnectError(f"{model} connection refused")
 
-    config = LLMConfig(cache_db_path=db_file, max_retries=2, backoff_factor=0.01)
+    config = LLMConfig(cache_db_path=db_file, max_retries=2, backoff_factor=0.01, replay_mode=False)
     client = LLMClient(config=config, custom_caller=always_fail_caller)
 
     with pytest.raises(LLMError) as exc_info:
@@ -177,7 +178,7 @@ def test_complete_pydantic_validation(tmp_path):
             "recommended_tool": "restart_service"
         })
 
-    config = LLMConfig(cache_db_path=db_file)
+    config = LLMConfig(cache_db_path=db_file, replay_mode=False)
     client = LLMClient(config=config, custom_caller=pydantic_caller)
 
     parsed_obj, resp = client.complete_pydantic("Formulate hypothesis", IncidentHypothesisOutput)
