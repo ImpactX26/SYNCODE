@@ -115,30 +115,38 @@ class SQLiteReplayCache:
 
     def __init__(self, db_path: str = "eval/replay_cache.sqlite"):
         self.db_path = db_path
-        if db_path != ":memory:":
+        self._memory_conn: Optional[sqlite3.Connection] = None
+        if db_path == ":memory:":
+            self._memory_conn = sqlite3.connect(":memory:", check_same_thread=False)
+            self._memory_conn.row_factory = sqlite3.Row
+        else:
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
+        if self._memory_conn is not None:
+            return self._memory_conn
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
     def _init_db(self) -> None:
-        with self._get_connection() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS llm_cache (
-                    cache_key TEXT PRIMARY KEY,
-                    prompt TEXT NOT NULL,
-                    system TEXT,
-                    model TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at REAL NOT NULL
-                )
-                """
+        conn = self._get_connection()
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS llm_cache (
+                cache_key TEXT PRIMARY KEY,
+                prompt TEXT NOT NULL,
+                system TEXT,
+                model TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at REAL NOT NULL
             )
-            conn.commit()
+            """
+        )
+        conn.commit()
+        if self._memory_conn is None:
+            conn.close()
 
     @staticmethod
     def compute_key(prompt: str, system: Optional[str], model: str, json_mode: bool = False) -> str:
@@ -148,12 +156,14 @@ class SQLiteReplayCache:
 
     def get(self, cache_key: str) -> Optional[str]:
         """Retrieve cached completion content if present."""
-        with self._get_connection() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT content FROM llm_cache WHERE cache_key = ?", (cache_key,))
-            row = cur.fetchone()
-            if row:
-                return row["content"]
+        conn = self._get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT content FROM llm_cache WHERE cache_key = ?", (cache_key,))
+        row = cur.fetchone()
+        if self._memory_conn is None:
+            conn.close()
+        if row:
+            return row["content"]
         return None
 
     def set(self, cache_key: str, prompt: str, system: Optional[str], model: str, content: str) -> None:
@@ -166,7 +176,6 @@ class SQLiteReplayCache:
                 """,
                 (cache_key, prompt, system or "", model, content, time.time()),
             )
-            conn.commit()
 
 
 # =====================================================================
