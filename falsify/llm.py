@@ -9,7 +9,7 @@ import re
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
 import httpx
 from pydantic import BaseModel, Field
 
@@ -71,8 +71,8 @@ class LLMConfig(BaseModel):
         default_factory=lambda: float(os.getenv("LLM_BACKOFF_FACTOR", "0.2")),
         description="Exponential backoff multiplier in seconds",
     )
-    replay_mode: bool = Field(
-        default_factory=lambda: os.getenv("REPLAY", "0").lower() in ("1", "true", "yes"),
+    replay_mode: Optional[bool] = Field(
+        default=None,
         description="When True, zero network calls are made and responses are served from cache only",
     )
     cache_db_path: str = Field(
@@ -211,6 +211,16 @@ class LLMClient:
         self.config = config or LLMConfig()
         self.cache = SQLiteReplayCache(db_path=self.config.cache_db_path)
         self._custom_caller = custom_caller  # Pluggable mock/test caller
+
+        # Resolve effective replay_mode:
+        # 1. Explicit per-client/test configuration (True or False) takes precedence.
+        # 2. When a custom caller is provided without explicit replay_mode, disable replay mode so test mocks run.
+        # 3. Otherwise (live/production without custom caller), fallback to REPLAY environment variable.
+        if self.config.replay_mode is None:
+            if self._custom_caller is not None:
+                self.config.replay_mode = False
+            else:
+                self.config.replay_mode = os.getenv("REPLAY", "0").lower() in ("1", "true", "yes")
 
     def _call_http_openai_compatible(
         self,
@@ -372,7 +382,7 @@ class LLMClient:
         """Execute completion, parse JSON output, and validate against a Pydantic model."""
         enhanced_prompt = (
             f"{prompt}\n\nRespond strictly with valid JSON conforming to schema: "
-            f"{json.dumps(pydantic_model.model_json_schema())}"
+            f"{json.dumps(pydantic_model.model_json_schema(), sort_keys=True)}"
         )
         response = self.complete(prompt=enhanced_prompt, system=system, json_mode=True)
         data = response.json_dict()
