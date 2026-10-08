@@ -1,0 +1,54 @@
+# Environment files and secrets
+.env
+*.env
+!.env.example
+
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Distribution and packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Databases and runtime caches
+*.db
+*.sqlite
+*.sqlite3
+eval/*.sqlite
+eval/*.db
+
+# Logs
+*.log
