@@ -1,29 +1,34 @@
 # Project Status: Falsify
 
-## Current Milestone: Phase A1 (Skeleton, Context Kit, and CI)
+## Current Milestone: Phase A2 (Confidence Engine + LLM Wrapper)
 
-### 1. What Changed (Phase A1)
-- Created project directory layout (`falsify/`, `falsify/tools/`, `targets/`, `app/api/`, `app/dashboard/`, `tests/`, `eval/`, `demo/`, `docs/`, `scripts/`, `.github/workflows/`).
-- Created foundational state models in `falsify/state.py` (`Evidence`, `Hypothesis`, `IncidentState`).
-- Created tool foundation in `falsify/tools/base.py` (`ToolResult`, `safe_tool` decorator, and typed stubs: `get_metrics`, `get_logs`, `get_deploy_history`, `probe_dependency`, `get_db_stats`, `restart_service`, `rollback_deploy`, `scale_service`).
-- Created foundation stubs for LangGraph orchestrator (`falsify/graph.py`), LLM client (`falsify/llm.py`), budget tracker (`falsify/budget.py`), decision gate (`falsify/gate.py`), confidence calculator (`falsify/confidence.py`), data sanitization (`falsify/sanitize.py`), and memory store (`falsify/memory.py`).
-- Authored contract documentation (`docs/CONTRACTS.md`), scenario placeholder (`docs/SCENARIOS.md`), and agent operational guidelines (`AGENTS.md`).
-- Configured environment and build files (`.env.example`, `.gitignore`, `requirements.txt`, `pytest.ini`, `docker-compose.yml`).
-- Created repository check script (`scripts/check_repo.py`) and preflight script (`preflight.py`).
-- Configured GitHub Actions CI workflow (`.github/workflows/ci.yml`) and pull request template (`.github/pull_request_template.md`).
-- Authored 11 placeholder unit test suites in `tests/`.
+### 1. What Changed (Phase A2)
+- Implemented deterministic evidence-driven confidence calculation engine in `falsify/confidence.py`:
+  - Added `get_leading_hypothesis` to prioritize active hypotheses by net supporting evidence.
+  - Implemented strict evidence caps: `CAP_ZERO_SUPPORTING` (0.20), `CAP_CONTRADICTING` (0.40), `CAP_FEWER_THAN_TWO_SOURCES` (0.60), and `MAX_CONFIDENCE` (0.95).
+  - Added source diversity weighting and bonus for falsified rival hypotheses.
+  - Added state updater helper `update_state_confidence(state: IncidentState)`.
+- Implemented resilient LLM client wrapper in `falsify/llm.py`:
+  - Added environment variable configuration (`PRIMARY_MODEL`, `FALLBACK_MODEL`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `REPLAY`, `REPLAY_CACHE_DB`, `LLM_MAX_RETRIES`, `LLM_TIMEOUT_SEC`).
+  - Added exponential backoff retry handler for transient HTTP 429, 5xx, and timeout errors.
+  - Added automatic fallback model invocation when primary model retries are exhausted.
+  - Added persistent SQLite replay cache with SHA-256 key hashing (`SQLiteReplayCache`).
+  - Added `REPLAY=1` zero-network execution mode.
+  - Added safe JSON extraction (`extract_and_parse_json`) handling markdown code fences and malformed responses.
+  - Added `complete_pydantic` helper for structured schema validation.
+- Expanded comprehensive unit test suites:
+  - `tests/test_confidence.py` (11 tests covering all evidence caps, source diversity, rival falsification, and edge cases).
+  - `tests/test_llm_fallback.py` (9 tests covering cache read/write, transient retries, fallback switching, replay mode, JSON parsing, and schema validation).
 
 ### 2. Tests Run & Validation
 - Ran `python scripts/check_repo.py`: PASSED (Integrity verified, all required context files present, no secret .env files tracked).
-- Ran `pytest --collect-only`: PASSED (21 test functions collected across 11 test modules).
-- Ran `pytest -q`: PASSED (`21 passed in 0.08s`).
+- Ran `pytest -v`: PASSED (`37 passed in 0.34s`).
 - Ran `python -c "import falsify.state"`: PASSED (`falsify.state imported successfully`).
-- Ran `preflight.py`: PASSED (Reported environment and dependencies with graceful warnings for optional/unconfigured local docker).
-- Ran `git status`: Verified working branch `feat/a-skeleton` with clean staged index and untracked A1 files ready for commit.
+- Ran `git status`: Verified working branch `reethu`.
 
 ### 3. Blockers / Risks
-- None. All foundation schemas, scaffolding, and tooling contracts are verified.
+- None.
 
 ### 4. Next Step
-- Phase A2: Implement deterministic confidence calculation (`falsify/confidence.py`) and resilient LLM client with SQLite replay cache (`falsify/llm.py`).
+- Phase A3: Implement LangGraph agent workflow nodes (`Triage`, `Hypothesis`, `Experiment`, `Skeptic`) in `falsify/graph.py`.
 
