@@ -186,3 +186,69 @@ def test_complete_pydantic_validation(tmp_path):
     assert parsed_obj.root_cause == "Database connection pool saturated"
     assert parsed_obj.confidence_estimate == 0.88
     assert parsed_obj.recommended_tool == "restart_service"
+
+
+def test_gemini_model_configuration(tmp_path):
+    """Verify Gemini API configuration and model support."""
+    db_file = str(tmp_path / "gemini_cache.sqlite")
+    invocations = []
+
+    def gemini_caller(model, system, prompt, json_mode):
+        invocations.append(model)
+        return json.dumps({
+            "root_cause": "Network partition between gateway and payment-service",
+            "confidence_estimate": 0.90,
+            "recommended_tool": "scale_service",
+        })
+
+    config = LLMConfig(
+        primary_model="gemini-2.0-flash",
+        fallback_model="gemini-1.5-flash",
+        gemini_api_key="mock_gemini_key",
+        cache_db_path=db_file,
+    )
+    assert config.primary_model == "gemini-2.0-flash"
+    assert config.fallback_model == "gemini-1.5-flash"
+    assert config.gemini_api_key == "mock_gemini_key"
+    assert "googleapis.com" in config.gemini_base_url
+
+    client = LLMClient(config=config, custom_caller=gemini_caller)
+    parsed_obj, resp = client.complete_pydantic("Analyze network telemetry", IncidentHypothesisOutput)
+
+    assert isinstance(parsed_obj, IncidentHypothesisOutput)
+    assert parsed_obj.recommended_tool == "scale_service"
+    assert "gemini-2.0-flash" in invocations
+
+
+def test_nvidia_nemotron_model_configuration(tmp_path):
+    """Verify NVIDIA NIM Nemotron model configuration and execution."""
+    db_file = str(tmp_path / "nvidia_cache.sqlite")
+    invocations = []
+
+    def nvidia_caller(model, system, prompt, json_mode):
+        invocations.append(model)
+        return json.dumps({
+            "root_cause": "Database connection pool saturated",
+            "confidence_estimate": 0.92,
+            "recommended_tool": "restart_service",
+        })
+
+    config = LLMConfig(
+        primary_model="nvidia/llama-3.1-nemotron-70b-instruct",
+        fallback_model="gemini-2.0-flash",
+        nvidia_api_key="mock_nvidia_key",
+        cache_db_path=db_file,
+    )
+    assert config.primary_model == "nvidia/llama-3.1-nemotron-70b-instruct"
+    assert config.fallback_model == "gemini-2.0-flash"
+    assert config.nvidia_api_key == "mock_nvidia_key"
+    assert "nvidia.com" in config.nvidia_base_url
+
+    client = LLMClient(config=config, custom_caller=nvidia_caller)
+    parsed_obj, resp = client.complete_pydantic("Analyze DB logs", IncidentHypothesisOutput)
+
+    assert isinstance(parsed_obj, IncidentHypothesisOutput)
+    assert parsed_obj.recommended_tool == "restart_service"
+    assert "nvidia/llama-3.1-nemotron-70b-instruct" in invocations
+
+

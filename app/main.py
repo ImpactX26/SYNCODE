@@ -210,3 +210,15 @@ if DASHBOARD_DIR.exists():
     @app.get("/dashboard")
     def serve_dashboard() -> FileResponse:
         return FileResponse(str(DASHBOARD_DIR / "index.html"))
+
+    @app.get("/style.css")
+    def serve_style_css() -> FileResponse:
+        return FileResponse(str(DASHBOARD_DIR / "style.css"), media_type="text/css")
+
+    @app.get("/mock_data.js")
+    def serve_mock_data_js() -> FileResponse:
+        return FileResponse(str(DASHBOARD_DIR / "mock_data.js"), media_type="application/javascript")
+
+    @app.get("/app.js")
+    def serve_app_js() -> FileResponse:
+        return FileResponse(str(DASHBOARD_DIR / "app.js"), media_type="application/javascript")

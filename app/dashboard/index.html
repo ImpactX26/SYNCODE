@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Falsify — Agentic AI SRE Incident Investigation System</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/static/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -39,8 +39,11 @@
       </div>
 
       <div class="playback-controls">
-        <button id="btn-play" class="btn-ctrl" title="Run/Pause Simulation">
-          <span>▶</span> Run Simulation
+        <button id="btn-run-backend" class="btn-ctrl" style="background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; font-weight: 700;" title="Execute scenario live against backend API">
+          <span>⚡</span> Run Backend
+        </button>
+        <button id="btn-play" class="btn-ctrl" title="Play/Pause Simulation Replay">
+          <span>▶</span> Instant Replay
         </button>
         <button id="btn-step" class="btn-ctrl" title="Step to Next Agent Action">
           <span>⏭</span> Step
@@ -262,7 +265,7 @@
   </footer>
 
   <!-- Scripts -->
-  <script src="mock_data.js"></script>
-  <script src="app.js"></script>
+  <script src="/static/mock_data.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>

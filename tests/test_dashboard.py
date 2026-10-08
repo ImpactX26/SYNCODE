@@ -86,8 +86,34 @@ def test_app_js_websocket_and_controller():
 
     assert "DashboardController" in content
     assert "loadScenario" in content
+    assert "runBackendScenario" in content
     assert "togglePlay" in content
     assert "stepForward" in content
     assert "resetScenario" in content
     assert "connectWebSocket" in content
     assert "ws://localhost:8000/ws/events" in content
+
+
+def test_dashboard_http_endpoints_return_200():
+    """Verify all dashboard routes and static assets return HTTP 200."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    routes = [
+        "/",
+        "/dashboard",
+        "/style.css",
+        "/mock_data.js",
+        "/app.js",
+        "/static/style.css",
+        "/static/mock_data.js",
+        "/static/app.js",
+        "/static/index.html",
+    ]
+
+    for route in routes:
+        resp = client.get(route)
+        assert resp.status_code == 200, f"Route '{route}' failed with status {resp.status_code}"
+
