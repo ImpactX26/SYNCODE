@@ -13,6 +13,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Un
 import httpx
 from pydantic import BaseModel, Field
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -78,6 +84,22 @@ class LLMConfig(BaseModel):
     cache_db_path: str = Field(
         default_factory=lambda: os.getenv("REPLAY_CACHE_DB", "eval/replay_cache.sqlite"),
         description="Path to SQLite replay cache",
+    )
+    gemini_api_key: Optional[str] = Field(
+        default_factory=lambda: os.getenv("GEMINI_API_KEY"),
+        description="Gemini API key (if available)",
+    )
+    gemini_base_url: str = Field(
+        default_factory=lambda: os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai"),
+        description="Gemini API Base URL (OpenAI-compatible)",
+    )
+    nvidia_api_key: Optional[str] = Field(
+        default_factory=lambda: os.getenv("NVIDIA_API_KEY"),
+        description="NVIDIA NIM API key (if available)",
+    )
+    nvidia_base_url: str = Field(
+        default_factory=lambda: os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1"),
+        description="NVIDIA NIM API Base URL (OpenAI-compatible)",
     )
     openai_api_key: Optional[str] = Field(
         default_factory=lambda: os.getenv("OPENAI_API_KEY"),
@@ -238,8 +260,32 @@ class LLMClient:
         system: Optional[str] = None,
         json_mode: bool = False,
     ) -> str:
-        """Execute HTTP request to OpenAI-compatible Chat Completions API."""
-        api_key = self.config.openai_api_key
+        """Execute HTTP request to OpenAI, Gemini, or NVIDIA NIM OpenAI-compatible Chat Completions API."""
+        m_lower = model.lower()
+        is_gemini = m_lower.startswith("gemini")
+        is_nvidia = m_lower.startswith("nvidia") or "nemotron" in m_lower or "/" in model
+
+        if is_gemini:
+            api_key = self.config.gemini_api_key or self.config.openai_api_key or self.config.anthropic_api_key
+            base_url = self.config.gemini_base_url
+        elif is_nvidia:
+            api_key = self.config.nvidia_api_key or self.config.openai_api_key
+            base_url = self.config.nvidia_base_url
+        elif bool(self.config.nvidia_api_key) and not bool(self.config.openai_api_key):
+            api_key = self.config.nvidia_api_key
+            base_url = self.config.nvidia_base_url
+        elif bool(self.config.gemini_api_key) and not bool(self.config.openai_api_key):
+            api_key = self.config.gemini_api_key
+            base_url = self.config.gemini_base_url
+        else:
+            api_key = (
+                self.config.openai_api_key
+                or self.config.nvidia_api_key
+                or self.config.gemini_api_key
+                or self.config.anthropic_api_key
+            )
+            base_url = self.config.openai_base_url
+
         if not api_key:
             raise LLMError(f"No API key configured for model {model}")
 
@@ -260,7 +306,7 @@ class LLMClient:
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
 
-        url = f"{self.config.openai_base_url.rstrip('/')}/chat/completions"
+        url = f"{base_url.rstrip('/')}/chat/completions"
 
         with httpx.Client(timeout=self.config.timeout_sec) as client:
             resp = client.post(url, json=payload, headers=headers)

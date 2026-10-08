@@ -2,11 +2,16 @@
 
 ## Current Milestone: Phase A5 — Final Integration & Polish
 
-### 1. What Changed (Phase A5)
+### 1. What Changed (Phase A5 & Multi-Provider LLM Integration)
 - **Agent Workflow Graph Integration (`falsify/graph.py`)**:
   - Integrated all 7 agent nodes in LangGraph: `triage_node`, `hypothesis_node`, `experiment_node`, `skeptic_node`, `gate_node`, `action_node`, `verify_node`, and `memory_node`.
   - Added conditional routing after the Safety Gate (`action` on `auto`/`approve`, `memory`/`END` on `escalate`).
   - Added full event streaming and audit timeline tracking with typed payloads (`incident_opened`, `hypotheses_proposed`, `tool_called`, `hypothesis_updated`, `skeptic_note`, `decision_made`, `action_taken`, `recovery_checked`, `incident_closed`, `memory_saved`).
+- **Multi-Provider LLM Support (`falsify/llm.py`, `.env.example`, `preflight.py`)**:
+  - Added native support for Gemini (`GEMINI_API_KEY`) and NVIDIA NIM / Nemotron (`NVIDIA_API_KEY`).
+  - Added automatic model provider routing and fallback switching between NVIDIA, Gemini, OpenAI, and Anthropic.
+  - Added environment validation in `preflight.py` for Gemini and NVIDIA API keys.
+  - Sanitized `.env.example` with template keys and ensured `.env` is safely ignored.
 - **Tool Registry Integration (`falsify/tools/base.py`)**:
   - Connected diagnostic tools (`get_metrics`, `get_logs`, `get_deploy_history`, `probe_dependency`, `get_db_stats`).
   - Connected allow-listed remediation tools (`restart_service`, `rollback_deploy`, `scale_service`).
@@ -29,21 +34,15 @@
   - Implemented fault injection and reset methods for all 5 scenarios aligning with `docs/SCENARIOS.md`.
 - **Comprehensive Documentation (`README.md`)**:
   - Added full architectural documentation, workflow diagrams, quickstart instructions, and safety guarantees.
-- **Expanded Test Suite**:
-  - `tests/test_api.py` (4 tests)
-  - `tests/test_faults.py` (2 tests)
-  - `tests/test_graph.py` (13 tests)
-  - `tests/test_gate.py` (7 tests)
-  - `tests/test_budget.py` (4 tests)
-  - `tests/test_dashboard.py` (4 tests)
-  - `tests/test_scenarios.py` (6 tests)
-  - Full suite now consists of **73 tests** (100% passing in both normal and `REPLAY=1` modes).
+- **Expanded Test Suite (`tests/test_llm_fallback.py`)**:
+  - Added tests for Gemini and NVIDIA NIM model configuration and execution.
+  - Full suite now consists of **78 tests** (100% passing in both normal and `REPLAY=1` modes).
 
 ### 2. Tests Run & Validation
-- Ran `pytest`: **PASSED** (`73 passed in 2.30s`).
-- Ran `REPLAY=1 pytest`: **PASSED** (`73 passed in 1.75s`).
+- Ran `pytest`: **PASSED** (`78 passed in 1.70s`).
+- Ran `REPLAY=1 pytest`: **PASSED** (`78 passed in 1.65s`).
 - Ran `python scripts/check_repo.py`: **PASSED** (all required context files present, no tracked secrets, scenarios and faults aligned).
-- Ran all 5 deterministic end-to-end scenario tests: **PASSED**.
+- Ran live NVIDIA NIM & Gemini live API validation tests: **PASSED**.
 - Ran preflight system check (`python preflight.py`): **PASSED**.
 
 ### 3. Blockers / Risks

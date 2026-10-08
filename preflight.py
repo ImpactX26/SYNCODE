@@ -17,9 +17,9 @@ def check_env_vars() -> Tuple[bool, str]:
     if replay:
         return True, f"OK (REPLAY=1 mode active, primary_model={primary_model})"
     
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        return False, "WARNING: Neither OPENAI_API_KEY nor ANTHROPIC_API_KEY found (set REPLAY=1 for offline replay)"
+        return False, "WARNING: No NVIDIA_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY found (set REPLAY=1 for offline replay)"
     return True, f"OK (Model API key present, primary_model={primary_model})"
 
 
