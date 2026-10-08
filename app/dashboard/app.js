@@ -33,6 +33,7 @@ class DashboardController {
   initDOM() {
     this.dom = {
       scenarioSelect: document.getElementById("scenario-select"),
+      btnRunBackend: document.getElementById("btn-run-backend"),
       btnPlay: document.getElementById("btn-play"),
       btnStep: document.getElementById("btn-step"),
       btnReset: document.getElementById("btn-reset"),
@@ -86,6 +87,10 @@ class DashboardController {
       this.loadScenario(e.target.value);
     });
 
+    if (this.dom.btnRunBackend) {
+      this.dom.btnRunBackend.addEventListener("click", () => this.runBackendScenario());
+    }
+
     this.dom.btnPlay.addEventListener("click", () => this.togglePlay());
     this.dom.btnStep.addEventListener("click", () => this.stepForward());
     this.dom.btnReset.addEventListener("click", () => this.resetScenario());
@@ -104,13 +109,12 @@ class DashboardController {
   loadScenario(key) {
     this.pause();
     this.currentScenarioKey = key;
-    const scenario = SCENARIOS[key];
-    if (!scenario) return;
+    const scenario = typeof SCENARIOS !== "undefined" ? SCENARIOS[key] : null;
 
     this.currentStepIndex = -1;
     this.state = {
       incident_id: `inc_${key}_${Date.now()}`,
-      title: scenario.name,
+      title: scenario ? scenario.name : key,
       status: "idle",
       blast_radius: "unknown",
       confidence: 0.0,
@@ -120,11 +124,63 @@ class DashboardController {
       events: []
     };
 
-    this.dom.scenarioDesc.textContent = scenario.description;
-    this.dom.expectedOutcome.textContent = scenario.expectedOutcome;
-    this.dom.serviceName.textContent = scenario.service;
+    if (scenario) {
+      this.dom.scenarioDesc.textContent = scenario.description;
+      this.dom.expectedOutcome.textContent = scenario.expectedOutcome;
+      this.dom.serviceName.textContent = scenario.service;
+    }
 
     this.render();
+  }
+
+  async runBackendScenario() {
+    this.pause();
+    const key = this.currentScenarioKey;
+    if (this.dom.btnRunBackend) {
+      this.dom.btnRunBackend.disabled = true;
+      this.dom.btnRunBackend.innerHTML = `<span>⏳</span> Running...`;
+    }
+    this.dom.connectionStatus.textContent = `🔵 Executing scenario '${key}' via Backend API...`;
+
+    this.state.events = [];
+    this.state.status = "investigating";
+    this.render();
+
+    try {
+      const response = await fetch(`/scenarios/${key}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      this.dom.connectionStatus.textContent = `🟢 Backend Complete: ${result.status} (decision: ${result.decision}, conf: ${Number(result.confidence || 0).toFixed(2)})`;
+
+      if (result.incident_id) {
+        try {
+          const incRes = await fetch(`/incidents/${result.incident_id}`);
+          if (incRes.ok) {
+            const incData = await incRes.json();
+            this.state = { ...this.state, ...incData };
+            this.render();
+          }
+        } catch (e) {
+          console.warn("Could not fetch full incident state snapshot", e);
+        }
+      }
+    } catch (err) {
+      console.warn("Backend API execution note:", err.message);
+      this.dom.connectionStatus.textContent = `⚠️ Backend error (${err.message}). Playing Instant Replay simulation.`;
+      this.play();
+    } finally {
+      if (this.dom.btnRunBackend) {
+        this.dom.btnRunBackend.disabled = false;
+        this.dom.btnRunBackend.innerHTML = `<span>⚡</span> Run Backend`;
+      }
+    }
   }
 
   togglePlay() {
@@ -136,11 +192,11 @@ class DashboardController {
   }
 
   play() {
-    const scenario = SCENARIOS[this.currentScenarioKey];
-    if (!scenario) return;
+    const scenario = typeof SCENARIOS !== "undefined" ? SCENARIOS[this.currentScenarioKey] : null;
+    if (!scenario || !scenario.timeline) return;
 
     this.isPlaying = true;
-    this.dom.btnPlay.innerHTML = `<span>⏸</span> Pause`;
+    this.dom.btnPlay.innerHTML = `<span>⏸</span> Pause Replay`;
     this.dom.btnPlay.classList.add("active");
 
     this.playInterval = setInterval(() => {
@@ -155,7 +211,7 @@ class DashboardController {
   pause() {
     this.isPlaying = false;
     if (this.playInterval) clearInterval(this.playInterval);
-    this.dom.btnPlay.innerHTML = `<span>▶</span> Run Simulation`;
+    this.dom.btnPlay.innerHTML = `<span>▶</span> Instant Replay`;
     this.dom.btnPlay.classList.remove("active");
   }
 
@@ -164,8 +220,8 @@ class DashboardController {
   }
 
   stepForward() {
-    const scenario = SCENARIOS[this.currentScenarioKey];
-    if (!scenario) return;
+    const scenario = typeof SCENARIOS !== "undefined" ? SCENARIOS[this.currentScenarioKey] : null;
+    if (!scenario || !scenario.timeline) return;
 
     if (this.currentStepIndex < scenario.timeline.length - 1) {
       this.currentStepIndex += 1;
@@ -175,12 +231,39 @@ class DashboardController {
   }
 
   processTimelineEvent(eventItem) {
-    // Record event
+    if (!eventItem) return;
     this.state.events.push(eventItem);
 
-    // Apply state mutations
+    // 1. Check if mock timeline event format
     if (eventItem.stateUpdate) {
       Object.assign(this.state, eventItem.stateUpdate);
+    }
+
+    // 2. Check if real CONTRACTS.md event envelope
+    const payload = eventItem.payload || {};
+    switch (eventItem.type) {
+      case "incident_opened":
+        if (payload.title) this.state.title = payload.title;
+        this.state.status = "investigating";
+        break;
+      case "hypotheses_proposed":
+        if (payload.hypotheses) this.state.hypotheses = payload.hypotheses;
+        break;
+      case "decision_made":
+        if (payload.decision) this.state.decision = payload.decision;
+        if (payload.confidence !== undefined) this.state.confidence = payload.confidence;
+        break;
+      case "action_taken":
+        this.state.actions_taken.push(payload);
+        break;
+      case "recovery_checked":
+        if (payload.recovered) {
+          this.state.status = "resolved";
+        }
+        break;
+      case "incident_closed":
+        this.state.status = payload.status || "resolved";
+        break;
     }
 
     this.render();

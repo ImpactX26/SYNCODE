@@ -227,6 +227,17 @@ def extract_and_parse_json(text: str) -> Dict[str, Any]:
         raise LLMMalformedResponseError(f"Failed to decode JSON: {e}", raw_content=text) from e
 
 
+def normalize_model_name(model: str) -> str:
+    """Normalize model identifier aliases to official provider slugs."""
+    m = model.strip()
+    m_lower = m.lower()
+    if m_lower in ("gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash"):
+        return "gemini-2.0-flash"
+    if m_lower in ("gemini-pro", "gemini-1.5"):
+        return "gemini-1.5-flash"
+    return m
+
+
 # =====================================================================
 # LLM Client
 # =====================================================================
@@ -261,9 +272,10 @@ class LLMClient:
         json_mode: bool = False,
     ) -> str:
         """Execute HTTP request to OpenAI, Gemini, or NVIDIA NIM OpenAI-compatible Chat Completions API."""
-        m_lower = model.lower()
+        resolved_model = normalize_model_name(model)
+        m_lower = resolved_model.lower()
         is_gemini = m_lower.startswith("gemini")
-        is_nvidia = m_lower.startswith("nvidia") or "nemotron" in m_lower or "/" in model
+        is_nvidia = m_lower.startswith("nvidia") or "nemotron" in m_lower or "/" in resolved_model
 
         if is_gemini:
             api_key = self.config.gemini_api_key or self.config.openai_api_key or self.config.anthropic_api_key
@@ -299,7 +311,7 @@ class LLMClient:
         messages.append({"role": "user", "content": prompt})
 
         payload: Dict[str, Any] = {
-            "model": model,
+            "model": resolved_model,
             "messages": messages,
             "temperature": 0.1,
         }
@@ -311,7 +323,7 @@ class LLMClient:
         with httpx.Client(timeout=self.config.timeout_sec) as client:
             resp = client.post(url, json=payload, headers=headers)
             if resp.status_code == 429:
-                raise httpx.HTTPStatusError("Rate limit exceeded", request=resp.request, response=resp)
+                raise httpx.HTTPStatusError("Rate limit exceeded (429)", request=resp.request, response=resp)
             elif resp.status_code >= 500:
                 raise httpx.HTTPStatusError(f"Server error {resp.status_code}", request=resp.request, response=resp)
             resp.raise_for_status()
@@ -326,19 +338,22 @@ class LLMClient:
         system: Optional[str] = None,
         json_mode: bool = False,
     ) -> str:
-        """Execute call to a specific model with exponential backoff retries."""
+        """Execute call to a specific model with exponential backoff retries and 429 pacing."""
         last_exception: Optional[Exception] = None
+        resolved_model = normalize_model_name(model)
 
         for attempt in range(1, self.config.max_retries + 1):
             try:
                 if self._custom_caller:
-                    return self._custom_caller(model, system, prompt, json_mode)
-                return self._call_http_openai_compatible(model, prompt, system, json_mode)
+                    return self._custom_caller(resolved_model, system, prompt, json_mode)
+                return self._call_http_openai_compatible(resolved_model, prompt, system, json_mode)
             except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.ConnectError, ConnectionError) as e:
                 last_exception = e
                 # Transient retryable error
                 if attempt < self.config.max_retries:
-                    sleep_time = self.config.backoff_factor * (2 ** (attempt - 1))
+                    is_rate_limit = isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429
+                    base = 1.0 if is_rate_limit else self.config.backoff_factor
+                    sleep_time = min(base * (2 ** (attempt - 1)), 5.0)
                     time.sleep(sleep_time)
                 else:
                     break
@@ -347,7 +362,7 @@ class LLMClient:
                 last_exception = e
                 break
 
-        raise LLMRetryExhaustedError(f"Model {model} failed after {self.config.max_retries} attempts: {last_exception}")
+        raise LLMRetryExhaustedError(f"Model {resolved_model} failed after {self.config.max_retries} attempts: {last_exception}")
 
     def complete(
         self,
